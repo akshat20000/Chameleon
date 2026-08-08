@@ -727,4 +727,29 @@ The objective is:
 
 > **Build a measurable, modular, temporally stable, real-time identity-transfer pipeline whose individual components can be understood, tested, benchmarked, replaced, and optimized independently.**
 
+## License
+
+Chameleon is licensed under the MIT License.
+
+Copyright © 2026 Akshat Prashar.
+
+See [LICENSE](LICENSE) for the full license text.
+
+### Third-Party Components
+
+Chameleon uses third-party libraries, frameworks, and model assets whose licenses remain separate from this project's license.
+
+Current major dependencies include:
+
+- MediaPipe
+- BlazeFace / MediaPipe Face Detector model
+- OpenCV
+- PyTorch
+- ONNX Runtime
+- NumPy
+- SciPy
+- FastAPI
+
+Before redistributing Chameleon or deploying it commercially, review the applicable licenses and terms for each dependency and model asset.
+
 ---
