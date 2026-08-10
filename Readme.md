@@ -6,9 +6,9 @@ Chameleon is a research-oriented real-time computer-vision system designed to tr
 
 The long-term goal is a **high-fidelity, low-latency real-time identity/appearance transfer pipeline** suitable for webcam and video input.
 
-> **Current status:** Phase 1 — Computer Vision Baseline  
-> **Completed:** Face detection pipeline and real-time webcam validation  
-> **Next:** Multi-frame face tracking
+> **Completed:** Face detection, 8D Kalman filter face tracking,
+> multi-person track continuity validation
+> **Next:** Dense facial landmarks & 3D pose estimation
 
 ---
 
@@ -403,68 +403,26 @@ Chameleon/
 
 # Next Task
 
-## Phase 1.2 — Face Tracking
+## Phase 1.3 — Dense Facial Landmarks & 3D Pose
 
 **Status: ⏳ Next**
 
-The next subsystem will introduce temporal identity persistence.
+The next subsystem will add dense facial landmark detection and 3D facial
+pose estimation on top of the existing detection and tracking pipeline.
 
-Initial baseline:
+Target capabilities:
 
-```text
-Face Detection
-      │
-      ▼
-Kalman Filter Prediction
-      │
-      ▼
-IoU Cost Matrix
-      │
-      ▼
-Hungarian Assignment
-      │
-      ▼
-Track Management
-      │
-      ▼
-Persistent Track IDs
-```
+- Dense facial landmarks
+- Eye landmarks
+- Iris/gaze landmarks
+- Mouth landmarks
+- Face contour
+- 3D landmark representation where available
 
-Planned Kalman state:
+Candidate technology:
 
 ```text
-[cx, cy, aspect_ratio, height,
- vx, vy, va, vh]
-```
-
-The tracker will support:
-
-- Track creation
-- Track prediction
-- Detection-to-track association
-- Track updates
-- Persistent integer IDs
-- Lost-track handling
-- `max_age`
-- `min_hits`
-- Configurable matching thresholds
-
-### Important correctness requirement
-
-A person's track identity must remain stable across frames:
-
-```text
-Frame 1 → Person A → Track #1
-Frame 2 → Person A → Track #1
-Frame 3 → Person A → Track #1
-...
-```
-
-This is especially important for the eventual identity-transfer system.
-
-If track identity changes or swaps between people, Chameleon could potentially apply the wrong target appearance to the wrong subject.
-
----
+MediaPipe Face Landmarker
 
 # Planned Phase 1 Components
 
@@ -674,14 +632,14 @@ Each major CV stage must have an explicit interface so implementations can be re
 │ Documentation foundation             │ ✅ Done    │
 │ Environment setup                    │ ✅ Done    │
 │ Configuration system                 │ ✅ Done    │
-│ Pipeline result structures            │ ✅ Done    │
-│ MediaPipe Tasks integration           │ ✅ Done    │
+│ Pipeline result structures           │ ✅ Done    │
+│ MediaPipe Tasks integration          │ ✅ Done    │
 │ BlazeFace model                      │ ✅ Done    │
 │ Face detector                        │ ✅ Done    │
 │ Webcam detector smoke test           │ ✅ Passed  │
 │ Detector benchmark                   │ ✅ Passed  │
-│ Face tracking                        │ ⏳ Next    │
-│ Dense landmarks                      │ ⏳ Planned │
+│ Face tracking (8D Kalman + Hungarian)│ ✅ Passed  │
+│ Dense landmarks                      │ ⏳ Next    │
 │ Segmentation                         │ ⏳ Planned │
 │ Pose / expression representation     │ ⏳ Planned │
 │ Identity representation              │ ⏳ Planned │
@@ -692,28 +650,76 @@ Each major CV stage must have an explicit interface so implementations can be re
 ```
 
 ---
+## Phase 1.2 — Face Tracking
+
+**Status: ✅ PASS**
+
+Implemented a multi-frame face tracking pipeline using an 8D Kalman filter
+and Hungarian assignment.
+
+### Tracking Architecture
+
+- **State Vector:** 8D `[cx, cy, a, h, vx, vy, va, vh]`
+- **Measurement Vector:** 4D `[cx, cy, a, h]`
+- **Association:** Hungarian algorithm
+- **Cost:** `1.0 - IoU`
+- **IoU Gating Threshold:** `0.2`
+- **Minimum Hits:** `3`
+- **Maximum Track Age:** `30` missed frames
+- **Re-identification:** Not implemented in Phase 1.2
+
+### Validation
+
+Unit and integration tests completed successfully:
+
+- Kalman filter tests: **8/8 passed**
+- Association tests: **5/5 passed**
+- Tracker tests: **13/13 passed**
+- Tracker integration smoke tests: **6/6 passed**
+- Full inference test suite: **26/26 passed**
+
+### Multi-Person Webcam Validation
+
+A controlled live webcam test was performed with multiple people visible.
+
+| Metric | Result |
+|---|---:|
+| Total frames | 2172 |
+| Frames with tracks | 1900 |
+| Single-face frames | 1243 |
+| Multi-person frames | 657 |
+| Maximum concurrent tracks | 3 |
+| Unique track IDs | 23 |
+| Track switches during single-face tracking | 11 |
+| Multi-person track-set changes | 2 |
+| Maximum same-ID streak | 309 frames |
+| Unobserved track instances | 827 |
+
+No identity swaps were observed during the controlled multi-person
+crossing/occlusion test.
+
+### Known Limitations
+
+The tracker currently relies on motion and spatial continuity. Track
+fragmentation can occur if detections are unavailable for longer than the
+configured maximum track age or if a face undergoes an extreme sudden
+spatial displacement.
+
+Appearance-based re-identification / feature embeddings are intentionally
+deferred to a later phase.
+
+---
+
+The next phase will add dense facial landmark detection and 3D facial pose
+estimation on top of the existing detection and tracking pipeline.
 
 # Immediate Next Step
 
 The next development session should begin with:
 
 ```text
-Phase 1.2 — Face Tracking
+Phase 1.3 — Dense Facial Landmarks & 3D Pose
 ```
-
-Before implementing anything, inspect the existing tracking subsystem and establish its current repository state.
-
-The first target is a deterministic:
-
-```text
-Detection → Kalman Prediction → IoU Matching → Persistent Track ID
-```
-
-baseline.
-
-Only after that baseline is validated should more sophisticated tracking approaches such as ByteTrack or appearance-assisted ReID be evaluated.
-
----
 
 # Project Philosophy
 

@@ -34,6 +34,8 @@ class TrackedFace:
     confidence: float
     age: int = 1
     hits: int = 1
+    time_since_update: int = 0
+    is_observed: bool = True
 
 @dataclass
 class LandmarkResult:

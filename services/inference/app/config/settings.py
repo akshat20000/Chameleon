@@ -15,9 +15,9 @@ class Settings(BaseSettings):
     nms_threshold: float = 0.3
     max_faces: int = 10
     tracker_backend: str = "kalman_iou"
-    track_high_thresh: float = 0.5
-    track_low_thresh: float = 0.1
-    match_threshold: float = 0.8
+    min_iou_threshold: float = 0.2
+    max_age: int = 30
+    min_hits: int = 3
     landmark_backend: str = "mediapipe"
     dense_landmarks: bool = True
     segmenter_backend: str = "mediapipe"
