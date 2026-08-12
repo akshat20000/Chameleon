@@ -7,8 +7,9 @@ Chameleon is a research-oriented real-time computer-vision system designed to tr
 The long-term goal is a **high-fidelity, low-latency real-time identity/appearance transfer pipeline** suitable for webcam and video input.
 
 > **Completed:** Face detection, 8D Kalman filter face tracking,
-> multi-person track continuity validation
-> **Next:** Dense facial landmarks & 3D pose estimation
+> multi-person track continuity validation,
+> dense facial landmarks & 3D pose (478-pt MediaPipe FaceLandmarker)
+> **Next:** Face & body segmentation
 
 ---
 
@@ -403,46 +404,31 @@ Chameleon/
 
 # Next Task
 
-## Phase 1.3 — Dense Facial Landmarks & 3D Pose
+## Phase 1.4 — Face & Body Segmentation
 
 **Status: ⏳ Next**
 
-The next subsystem will add dense facial landmark detection and 3D facial
-pose estimation on top of the existing detection and tracking pipeline.
+The next subsystem will add semantic segmentation of face and body regions
+on top of the existing detection, tracking, and landmark pipeline.
 
 Target capabilities:
 
-- Dense facial landmarks
-- Eye landmarks
-- Iris/gaze landmarks
-- Mouth landmarks
-- Face contour
-- 3D landmark representation where available
+- Face mask
+- Skin mask
+- Hair mask
+- Eyes
+- Mouth
+- Neck
+- Background
+- Clothing where supported
+
+The segmentation stage will provide masks required for accurate compositing
+and identity transfer.
 
 Candidate technology:
 
 ```text
-MediaPipe Face Landmarker
-
-# Planned Phase 1 Components
-
-After tracking:
-
-### Facial Landmarks
-
-Target capabilities:
-
-- Dense facial landmarks
-- Eye landmarks
-- Iris/gaze landmarks
-- Mouth landmarks
-- Face contour
-- 3D landmark representation where available
-
-Candidate technology:
-
-```text
-MediaPipe Face Landmarker
+MediaPipe Image Segmenter
 ```
 
 ---
@@ -639,8 +625,8 @@ Each major CV stage must have an explicit interface so implementations can be re
 │ Webcam detector smoke test           │ ✅ Passed  │
 │ Detector benchmark                   │ ✅ Passed  │
 │ Face tracking (8D Kalman + Hungarian)│ ✅ Passed  │
-│ Dense landmarks                      │ ⏳ Next    │
-│ Segmentation                         │ ⏳ Planned │
+│ Dense landmarks (478-pt, 3D)         │ ✅ Done    │
+│ Segmentation                         │ ⏳ Next    │
 │ Pose / expression representation     │ ⏳ Planned │
 │ Identity representation              │ ⏳ Planned │
 │ Appearance transfer                  │ ⏳ Planned │
@@ -710,15 +696,92 @@ deferred to a later phase.
 
 ---
 
-The next phase will add dense facial landmark detection and 3D facial pose
-estimation on top of the existing detection and tracking pipeline.
+## Phase 1.3 — Dense Facial Landmarks & 3D Pose
+
+**Status: ✅ PASS**
+
+Implemented dense facial landmark detection using the MediaPipe FaceLandmarker
+(Tasks API) with IoU + Hungarian algorithm association to tracked faces.
+
+### Landmark Architecture
+
+- **Model:** MediaPipe FaceLandmarker (`face_landmarker.task`, float16, 478-pt)
+- **Output — 2D:** `points_2d` shape `(478, 2)` — pixel coordinates `[x, y]`
+- **Output — 3D:** `points_3d` shape `(478, 3)` — `[x_pixel, y_pixel, z]` where `z` is MediaPipe canonical depth
+- **Association — Stage 1:** IoU cost matrix + Hungarian algorithm (threshold > 0)
+- **Association — Stage 2:** Centroid-distance greedy fallback for zero-IoU cases
+- **Confidence:** Fixed at `1.0` (FaceLandmarker exposes no per-face score)
+- **Graceful degradation:** `is_ready = False` when model absent; `detect()` returns `{}`
+
+### Validation
+
+Unit tests completed successfully:
+
+- Missing model tests: **2/2 passed**
+- Initialization tests: **3/3 passed**
+- Empty/degenerate input tests: **4/4 passed**
+- 2D coordinate conversion tests: **3/3 passed**
+- 3D coordinate conversion tests: **4/4 passed**
+- Track association tests: **5/5 passed**
+- Matching function (pure) tests: **7/7 passed**
+- 478-landmark count tests: **2/2 passed**
+
+### Real-World Validation
+
+Single-face inference (real MediaPipe model):
+
+| Metric | Result |
+|---|---:|
+| Landmark count (2D) | **478** |
+| Landmark count (3D) | **478** |
+| Latency | **15.4 ms** |
+| NaN / Inf values | None |
+| IoU (LM bbox vs track bbox) | **0.838** |
+
+Multi-face spatial association (controlled two-face fixture, 820×400):
+
+| Metric | Result |
+|---|---:|
+| Detector face count | **2** |
+| Tracker face count | **2** |
+| Landmark result count | **2** |
+| IoU Track 1 (LM vs track bbox) | **0.8203** |
+| IoU Track 2 (LM vs track bbox) | **0.7795** |
+| Off-diagonal IoU (cross-assignment) | **0.0000** |
+| Duplicate assignments | **0** |
+| Association errors | **0** |
+
+Temporal stability (10-frame synthetic sequence — converging, close, diverging):
+
+| Metric | Result |
+|---|---:|
+| Frames tested | **10** |
+| Track IDs stable across all frames | **✅ [1, 2] constant** |
+| Association errors (wrong track) | **0** |
+| Duplicate assignments | **0** |
+| IoU min / mean / max | **0.61 / 0.72 / 0.84** |
+| Per-frame landmark latency | **15–21 ms** |
+
+### Known Limitations
+
+- FaceLandmarker's internal detector requires faces to be sufficiently large
+  in the frame; very small or distant faces may not produce landmark results
+  even when BlazeFace detects them.
+- Landmark association is purely spatial (IoU + centroid distance).
+  Appearance-based identity disambiguation is deferred to a later phase.
+- `z` depth is MediaPipe canonical space, not metric world-space depth.
+
+---
+
+The next phase will add semantic face and body segmentation on top of the
+existing detection, tracking, and landmark pipeline.
 
 # Immediate Next Step
 
 The next development session should begin with:
 
 ```text
-Phase 1.3 — Dense Facial Landmarks & 3D Pose
+Phase 1.4 — Face & Body Segmentation
 ```
 
 # Project Philosophy
