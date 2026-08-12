@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     segmenter_backend: str = "mediapipe"
     segmentation_threshold: float = 0.5
     segmentation_model_path: Path = Path("models/selfie_multiclass_256x256.tflite")
+    identity_backend: str = "onnx"
+    identity_model_path: Path = Path("models/w600k_mbf.onnx")
     input_resolution: Tuple[int, int] = (640, 480)
     target_fps: int = 30
     models_dir: Path = Path("models")

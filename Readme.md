@@ -10,8 +10,9 @@ The long-term goal is a **high-fidelity, low-latency real-time identity/appearan
 > multi-person track continuity validation,
 > dense facial landmarks & 3D pose (478-pt MediaPipe FaceLandmarker),
 > semantic face & body segmentation (MediaPipe ImageSegmenter multiclass),
-> parametric pose & expression representation (Euler pitch/yaw/roll + 52 ARKit blendshapes)
-> **Next:** Target identity representation
+> parametric pose & expression representation (Euler pitch/yaw/roll + 52 ARKit blendshapes),
+> target identity representation & feature encoder (ArcFace MobileFaceNet 512-dim ONNX)
+> **Next:** Appearance transfer
 
 ---
 
@@ -406,24 +407,25 @@ Chameleon/
 
 # Next Task
 
-## Phase 1.6 — Target Identity Representation
+## Phase 1.7 — Appearance Transfer
 
 **Status: ⏳ Next**
 
-The next subsystem will build a lightweight identity representation / encoder module
-for source and target faces to prepare for appearance transfer.
+The next phase will implement identity-conditioned appearance transfer, combining
+source geometry (landmarks/pose/expression) and target identity embeddings to generate
+the transformed appearance.
 
 Target capabilities:
 
-- Identity embedding extraction
-- Reference face encoding
-- Feature fusion & normalization
-- Track-to-identity association
+- Identity-conditioned face synthesis / neural rendering
+- Expression injection & pose adaptation
+- Lighting estimation & transfer
+- Initial source-target composition
 
 Candidate technology:
 
 ```text
-ArcFace / InsightFace / ResNet identity encoder
+Identity-conditioned neural generator / swap pipeline
 ```
 
 ---
@@ -623,8 +625,8 @@ Each major CV stage must have an explicit interface so implementations can be re
 │ Dense landmarks (478-pt, 3D)         │ ✅ Done    │
 │ Segmentation (multiclass)            │ ✅ Done    │
 │ Pose & expression representation     │ ✅ Done    │
-│ Identity representation              │ ⏳ Next    │
-│ Appearance transfer                  │ ⏳ Planned │
+│ Identity representation (ArcFace)    │ ✅ Done    │
+│ Appearance transfer                  │ ⏳ Next    │
 │ Temporal stabilization               │ ⏳ Planned │
 │ Final real-time pipeline             │ ⏳ Planned │
 └──────────────────────────────────────┴────────────┘
@@ -870,15 +872,54 @@ Enabling 52 blendshapes and 4×4 transformation matrix extraction in the existin
 
 ---
 
-The next phase will add target identity representation and embedding extraction on top of the
-existing computer vision baseline pipeline.
+## Phase 1.6 — Target Identity Representation
+
+**Status: ✅ PASS**
+
+Implemented facial identity representation & feature encoding using an ArcFace MobileFaceNet ONNX model.
+
+### Identity Architecture
+
+- **Model:** ArcFace MobileFaceNet (`w600k_mbf.onnx`, ~13.6 MB) via ONNX Runtime CPU provider.
+- **Input Contract:** RGB float32 tensor of shape `(1, 3, 112, 112)`, range `[-1.0, 1.0]`.
+- **Output:** 512-dimensional float32 vector, $L_2$-normalized to unit length (`norm == 1.0`).
+- **Face Alignment:** Deterministic 5-point similarity transformation (`cv2.estimateAffinePartial2D`) from MediaPipe landmarks 468 (left eye), 473 (right eye), 1 (nose tip), 61 (left mouth), 291 (right mouth) to standard ArcFace $112 \times 112$ canonical destination template.
+- **Multi-Reference Fusion:** `fuse_embeddings()` computes normalized mean vector across multiple reference images.
+- **State Decoupling:** Target identity embeddings are maintained as persistent session-level state (`target_id` $\to$ embedding), decoupled from per-frame `PipelineResult`.
+
+### Validation & Real-Data Performance
+
+Unit tests and real-world benchmarks completed successfully:
+
+- Identity unit tests: **17/17 passed**
+- Full test suite: **94/94 passed**
+
+Measured on real images (`test_data/face.png` & `test_data/2face_validation.png`):
+
+| Metric | Measured Value | Context |
+|---|---:|---|
+| Model initialization latency | **165.28 ms** | One-time session setup cost |
+| Live embedding extraction latency | **4.99 ms (mean)** | Steady-state (min 4.73 ms, median 4.97 ms, max 5.27 ms) |
+| Cosine similarity — Same Person (rot) | **0.9971** | High identity consistency |
+| Cosine similarity — Different Persons | **0.1391** | Clear inter-person separation |
+| Multi-reference fusion | **Unit norm 1.0** | 512-dim normalized mean vector |
+
+### Known Limitations
+
+- Appearance-based tracking re-identification is deferred to temporal processing.
+- Face alignment requires landmark detection to resolve 5 key points.
+
+---
+
+The next phase will implement identity-conditioned appearance transfer on top of the
+established computer vision baseline pipeline.
 
 # Immediate Next Step
 
 The next development session should begin with:
 
 ```text
-Phase 1.6 — Target Identity Representation
+Phase 1.7 — Appearance Transfer
 ```
 
 # Project Philosophy
