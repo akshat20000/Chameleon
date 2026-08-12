@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     landmark_min_tracking_confidence: float = 0.5
     segmenter_backend: str = "mediapipe"
     segmentation_threshold: float = 0.5
+    segmentation_model_path: Path = Path("models/selfie_multiclass_256x256.tflite")
     input_resolution: Tuple[int, int] = (640, 480)
     target_fps: int = 30
     models_dir: Path = Path("models")

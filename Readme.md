@@ -8,8 +8,9 @@ The long-term goal is a **high-fidelity, low-latency real-time identity/appearan
 
 > **Completed:** Face detection, 8D Kalman filter face tracking,
 > multi-person track continuity validation,
-> dense facial landmarks & 3D pose (478-pt MediaPipe FaceLandmarker)
-> **Next:** Face & body segmentation
+> dense facial landmarks & 3D pose (478-pt MediaPipe FaceLandmarker),
+> semantic face & body segmentation (MediaPipe ImageSegmenter multiclass)
+> **Next:** Pose & expression representation
 
 ---
 
@@ -404,31 +405,29 @@ Chameleon/
 
 # Next Task
 
-## Phase 1.4 — Face & Body Segmentation
+## Phase 1.5 — Pose & Expression Representation
 
 **Status: ⏳ Next**
 
-The next subsystem will add semantic segmentation of face and body regions
-on top of the existing detection, tracking, and landmark pipeline.
+The next subsystem will extract parametric pose and facial expression
+representation (head pose, expression weights/blendshapes, gaze vector)
+from the source subject.
 
 Target capabilities:
 
-- Face mask
-- Skin mask
-- Hair mask
-- Eyes
-- Mouth
-- Neck
-- Background
-- Clothing where supported
+- Head pose (Euler angles: pitch, yaw, roll)
+- Expression weights / blendshapes
+- Eye gaze vector
+- Mouth shape / movement
+- Body pose keypoints (where applicable)
 
-The segmentation stage will provide masks required for accurate compositing
-and identity transfer.
+The pose & expression stage will provide the source geometry parameters
+required for identity transfer and synthesis.
 
 Candidate technology:
 
 ```text
-MediaPipe Image Segmenter
+OpenCV PnP solver / MediaPipe face mesh geometry
 ```
 
 ---
@@ -626,8 +625,8 @@ Each major CV stage must have an explicit interface so implementations can be re
 │ Detector benchmark                   │ ✅ Passed  │
 │ Face tracking (8D Kalman + Hungarian)│ ✅ Passed  │
 │ Dense landmarks (478-pt, 3D)         │ ✅ Done    │
-│ Segmentation                         │ ⏳ Next    │
-│ Pose / expression representation     │ ⏳ Planned │
+│ Segmentation (multiclass)            │ ✅ Done    │
+│ Pose / expression representation     │ ⏳ Next    │
 │ Identity representation              │ ⏳ Planned │
 │ Appearance transfer                  │ ⏳ Planned │
 │ Temporal stabilization               │ ⏳ Planned │
@@ -773,15 +772,70 @@ Temporal stability (10-frame synthetic sequence — converging, close, diverging
 
 ---
 
-The next phase will add semantic face and body segmentation on top of the
-existing detection, tracking, and landmark pipeline.
+## Phase 1.4 — Face & Body Segmentation
+
+**Status: ✅ PASS**
+
+Implemented semantic face and body segmentation using MediaPipe Tasks Image Segmenter
+(`selfie_multiclass_256x256.tflite`).
+
+### Segmentation Architecture
+
+- **Model:** MediaPipe `selfie_multiclass_256x256.tflite` (~16.37 MB)
+- **Output — `class_mask`:** shape `(H, W)`, dtype `uint8` (values 0–5)
+- **Output — `face_mask`:** shape `(H, W)`, dtype `bool` (class 3 `face-skin`)
+- **Output — `hair_mask`:** shape `(H, W)`, dtype `bool` (class 1 `hair`)
+- **Output — `skin_mask`:** shape `(H, W)`, dtype `bool` (class 2 `body-skin`)
+- **Resizing:** `cv2.INTER_NEAREST` (nearest-neighbor) when MediaPipe output resolution differs from input frame
+- **Scope:** Whole-frame segmentation, independent of tracking / landmarks
+- **Graceful degradation:** `is_ready = False` when model absent; `segment()` returns `None`
+
+### Model Class Mapping (Verified from Metadata)
+
+- Index 0: `background`
+- Index 1: `hair` → `hair_mask`
+- Index 2: `body-skin` → `skin_mask`
+- Index 3: `face-skin` → `face_mask`
+- Index 4: `clothes` → present in `class_mask`
+- Index 5: `others` → present in `class_mask`
+
+### Validation
+
+Unit and integration tests completed successfully:
+
+- Segmenter unit tests: **12/12 passed**
+- Full inference test suite: **68/68 passed**
+
+### Real-World Validation & Performance Benchmark
+
+Measured on real image `test_data/2face_validation.png` (820 × 400 px, 30 iterations, CPU / TFLite XNNPACK):
+
+| Metric | Result |
+|---|---:|
+| Minimum latency | **105.82 ms** |
+| Mean latency | **112.31 ms** |
+| Median latency | **112.54 ms** |
+| P95 latency | **116.88 ms** |
+| P99 latency | **118.70 ms** |
+| Maximum latency | **119.44 ms** |
+| Class distribution | Background (44.53%), Clothes (24.68%), Face (12.67%), Hair (10.76%), Body-skin (7.36%) |
+
+### Known Limitations
+
+- Independent segmentation of eyes, mouth, and neck is not supported by the candidate model and is deferred.
+- CPU inference latency (~112 ms) exceeds real-time frame budgets (33.3 ms for 30 FPS) without hardware acceleration or delegate optimization.
+
+---
+
+The next phase will add parametric head pose and expression representation on top of the
+existing detection, tracking, landmark, and segmentation pipeline.
 
 # Immediate Next Step
 
 The next development session should begin with:
 
 ```text
-Phase 1.4 — Face & Body Segmentation
+Phase 1.5 — Pose & Expression Representation
 ```
 
 # Project Philosophy
