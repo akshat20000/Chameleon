@@ -43,6 +43,15 @@ class LandmarkResult:
     points_3d: Optional[np.ndarray] = None
     confidence: float = 1.0
     landmarks_type: str = "478_pt"
+
+@dataclass
+class PoseResult:
+    pitch: float
+    yaw: float
+    roll: float
+    transformation_matrix: np.ndarray
+    blendshapes: Dict[str, float]
+
 @dataclass
 class SegmentationResult:
     face_mask: np.ndarray
@@ -58,5 +67,6 @@ class PipelineResult:
     detections: List[FaceDetection] = field(default_factory=list)
     tracks: List[TrackedFace] = field(default_factory=list)
     landmarks: Dict[int, LandmarkResult] = field(default_factory=dict)
+    pose: Dict[int, PoseResult] = field(default_factory=dict)
     segmentation: Optional[SegmentationResult] = None
     timings: Dict[str, float] = field(default_factory=dict)

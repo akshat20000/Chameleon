@@ -43,7 +43,7 @@ import cv2
 import numpy as np
 
 from app.config.settings import get_settings
-from app.pipeline.result import BoundingBox, LandmarkResult, TrackedFace
+from app.pipeline.result import BoundingBox, LandmarkResult, PoseResult, TrackedFace
 from app.tracking.association import build_iou_cost_matrix, hungarian_match
 
 
@@ -75,6 +75,23 @@ class BaseLandmarker(ABC):
             Returns an empty dict when no landmarks can be detected,
             no tracks are provided, or the component is not ready.
         """
+        pass
+
+    @abstractmethod
+    def detect_landmarks_and_pose(
+        self,
+        image: np.ndarray,
+        tracks: List[TrackedFace],
+    ) -> Tuple[Dict[int, LandmarkResult], Dict[int, PoseResult]]:
+        """
+        Run face landmark detection and pose estimation in a single pass.
+
+        Returns
+        -------
+        Tuple[Dict[int, LandmarkResult], Dict[int, PoseResult]]
+            Mapping (landmarks_dict, pose_dict) keyed by track_id.
+        """
+        pass
 
 
 class MediaPipeLandmarker(BaseLandmarker):
@@ -82,29 +99,9 @@ class MediaPipeLandmarker(BaseLandmarker):
     Face landmarker backed by MediaPipe Tasks API (mediapipe 1.0.0).
 
     Runs a single FaceLandmarker call on the full frame with
-    num_faces = settings.max_faces.  Results are then associated with
-    caller-supplied track IDs via IoU + centroid-distance matching.
-
-    Parameters
-    ----------
-    model_path : str, optional
-        Filesystem path to the face_landmarker.task model file.
-        Defaults to settings.landmark_model_path.
-    num_faces : int, optional
-        Maximum number of faces to detect.  Defaults to settings.max_faces.
-    min_detection_confidence : float, optional
-        Defaults to settings.landmark_min_detection_confidence.
-    min_presence_confidence : float, optional
-        Defaults to settings.landmark_min_presence_confidence.
-    min_tracking_confidence : float, optional
-        Defaults to settings.landmark_min_tracking_confidence.
-
-    Notes
-    -----
-    If the model file is absent the instance is created in a degraded state
-    (is_ready == False).  All detect() calls will return {} rather than
-    raising.  This mirrors the existing repository convention used by
-    MediaPipeDetector and YuNetDetector.
+    num_faces = settings.max_faces, extracting 478 landmarks, 52 ARKit
+    blendshapes, and 4x4 facial transformation matrix. Results are associated
+    with caller-supplied track IDs via IoU + centroid-distance matching.
     """
 
     _IOU_MATCH_THRESHOLD: float = 0.01  # any positive overlap qualifies
@@ -144,8 +141,6 @@ class MediaPipeLandmarker(BaseLandmarker):
         self._landmarker = None
 
         if not os.path.exists(resolved_path):
-            # Graceful degradation: model absent → is_ready == False.
-            # Consistent with MediaPipeDetector / YuNetDetector convention.
             return
 
         base_options = tasks.BaseOptions(model_asset_path=resolved_path)
@@ -155,8 +150,8 @@ class MediaPipeLandmarker(BaseLandmarker):
             min_face_detection_confidence=self._min_detection,
             min_face_presence_confidence=self._min_presence,
             min_tracking_confidence=self._min_tracking,
-            output_face_blendshapes=False,
-            output_facial_transformation_matrixes=False,
+            output_face_blendshapes=True,
+            output_facial_transformation_matrixes=True,
         )
         self._landmarker = vision.FaceLandmarker.create_from_options(options)
 
@@ -165,9 +160,42 @@ class MediaPipeLandmarker(BaseLandmarker):
         """True when the model loaded successfully and detect() will run inference."""
         return self._landmarker is not None
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
+    @staticmethod
+    def matrix_to_euler_zyx(R: np.ndarray) -> Tuple[float, float, float]:
+        """
+        Convert a 3x3 rotation matrix to Euler angles (pitch, yaw, roll) in degrees
+        using the ZYX convention:
+            R = Rz(roll) * Ry(yaw) * Rx(pitch)
+
+        Coordinate & Angle Semantics
+        ----------------------------
+        yaw   : rotation around Y-axis (left/right head turn), range [-90, 90] degrees.
+        pitch : rotation around X-axis (up/down head tilt), range [-180, 180] degrees.
+        roll  : rotation around Z-axis (side-to-side head tilt), range [-180, 180] degrees.
+
+        Gimbal Lock
+        -----------
+        Handled deterministically when |R[2, 0]| >= 0.999999.
+        """
+        r20 = float(R[2, 0])
+        clamped_r20 = float(np.clip(-r20, -1.0, 1.0))
+        yaw_rad = float(np.arcsin(clamped_r20))
+
+        if abs(r20) >= 0.999999:
+            roll_rad = 0.0
+            if r20 < 0:
+                pitch_rad = float(np.arctan2(R[0, 1], R[1, 1]))
+            else:
+                pitch_rad = float(np.arctan2(-R[0, 1], R[1, 1]))
+        else:
+            pitch_rad = float(np.arctan2(R[2, 1], R[2, 2]))
+            roll_rad = float(np.arctan2(R[1, 0], R[0, 0]))
+
+        pitch_deg = float(np.degrees(pitch_rad))
+        yaw_deg = float(np.degrees(yaw_rad))
+        roll_deg = float(np.degrees(roll_rad))
+
+        return pitch_deg, yaw_deg, roll_deg
 
     def detect(
         self,
@@ -175,18 +203,23 @@ class MediaPipeLandmarker(BaseLandmarker):
         tracks: List[TrackedFace],
     ) -> Dict[int, LandmarkResult]:
         """
-        Run FaceLandmarker on the full frame and return per-track results.
+        Run FaceLandmarker on the full frame and return per-track LandmarkResults.
+        Preserves backward-compatible Phase 1.3 interface.
+        """
+        landmarks_dict, _ = self.detect_landmarks_and_pose(image, tracks)
+        return landmarks_dict
 
-        Returns {} when:
-        - is_ready is False (model absent)
-        - image is None or empty
-        - no tracks are provided
-        - MediaPipe detects no faces in the frame
-
-        Unexpected runtime exceptions from MediaPipe are NOT swallowed.
+    def detect_landmarks_and_pose(
+        self,
+        image: np.ndarray,
+        tracks: List[TrackedFace],
+    ) -> Tuple[Dict[int, LandmarkResult], Dict[int, PoseResult]]:
+        """
+        Run FaceLandmarker in a single inference pass and return both landmarks
+        and pose/blendshapes, associated using the same track IDs.
         """
         if self._landmarker is None or image is None or image.size == 0 or not tracks:
-            return {}
+            return {}, {}
 
         import mediapipe as mp
 
@@ -196,7 +229,7 @@ class MediaPipeLandmarker(BaseLandmarker):
         result = self._landmarker.detect(mp_image)
 
         if not result.face_landmarks:
-            return {}
+            return {}, {}
 
         # ---- Convert each MP face to pixel coordinates ----
         face_data: List[Tuple[np.ndarray, np.ndarray, Tuple[float, float, float, float], Tuple[float, float]]] = []
@@ -225,18 +258,52 @@ class MediaPipeLandmarker(BaseLandmarker):
 
         mp_to_track_idx = self._match_faces_to_tracks(lm_boxes, lm_centroids, track_boxes)
 
-        out: Dict[int, LandmarkResult] = {}
+        landmarks_out: Dict[int, LandmarkResult] = {}
+        pose_out: Dict[int, PoseResult] = {}
+
         for mp_idx, track_idx in mp_to_track_idx.items():
             pts2d, pts3d, _, _ = face_data[mp_idx]
             track_id = tracks[track_idx].track_id
-            out[track_id] = LandmarkResult(
+
+            landmarks_out[track_id] = LandmarkResult(
                 points_2d=pts2d,
                 points_3d=pts3d,
-                confidence=1.0,   # FaceLandmarker returns no per-face score; see module docstring
+                confidence=1.0,
                 landmarks_type="478_pt",
             )
 
-        return out
+            has_bs = (
+                result.face_blendshapes is not None
+                and mp_idx < len(result.face_blendshapes)
+                and result.face_blendshapes[mp_idx] is not None
+            )
+            has_mat = (
+                result.facial_transformation_matrixes is not None
+                and mp_idx < len(result.facial_transformation_matrixes)
+                and result.facial_transformation_matrixes[mp_idx] is not None
+            )
+
+            if has_bs and has_mat:
+                blendshapes_dict = {
+                    b.category_name: float(b.score)
+                    for b in result.face_blendshapes[mp_idx]
+                }
+                mat_arr = np.array(
+                    result.facial_transformation_matrixes[mp_idx],
+                    dtype=np.float32,
+                )
+                if mat_arr.shape == (4, 4):
+                    R = mat_arr[:3, :3]
+                    pitch, yaw, roll = self.matrix_to_euler_zyx(R)
+                    pose_out[track_id] = PoseResult(
+                        pitch=pitch,
+                        yaw=yaw,
+                        roll=roll,
+                        transformation_matrix=mat_arr,
+                        blendshapes=blendshapes_dict,
+                    )
+
+        return landmarks_out, pose_out
 
     # ------------------------------------------------------------------
     # Internal matching logic

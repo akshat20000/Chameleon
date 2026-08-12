@@ -9,8 +9,9 @@ The long-term goal is a **high-fidelity, low-latency real-time identity/appearan
 > **Completed:** Face detection, 8D Kalman filter face tracking,
 > multi-person track continuity validation,
 > dense facial landmarks & 3D pose (478-pt MediaPipe FaceLandmarker),
-> semantic face & body segmentation (MediaPipe ImageSegmenter multiclass)
-> **Next:** Pose & expression representation
+> semantic face & body segmentation (MediaPipe ImageSegmenter multiclass),
+> parametric pose & expression representation (Euler pitch/yaw/roll + 52 ARKit blendshapes)
+> **Next:** Target identity representation
 
 ---
 
@@ -405,29 +406,24 @@ Chameleon/
 
 # Next Task
 
-## Phase 1.5 — Pose & Expression Representation
+## Phase 1.6 — Target Identity Representation
 
 **Status: ⏳ Next**
 
-The next subsystem will extract parametric pose and facial expression
-representation (head pose, expression weights/blendshapes, gaze vector)
-from the source subject.
+The next subsystem will build a lightweight identity representation / encoder module
+for source and target faces to prepare for appearance transfer.
 
 Target capabilities:
 
-- Head pose (Euler angles: pitch, yaw, roll)
-- Expression weights / blendshapes
-- Eye gaze vector
-- Mouth shape / movement
-- Body pose keypoints (where applicable)
-
-The pose & expression stage will provide the source geometry parameters
-required for identity transfer and synthesis.
+- Identity embedding extraction
+- Reference face encoding
+- Feature fusion & normalization
+- Track-to-identity association
 
 Candidate technology:
 
 ```text
-OpenCV PnP solver / MediaPipe face mesh geometry
+ArcFace / InsightFace / ResNet identity encoder
 ```
 
 ---
@@ -626,8 +622,8 @@ Each major CV stage must have an explicit interface so implementations can be re
 │ Face tracking (8D Kalman + Hungarian)│ ✅ Passed  │
 │ Dense landmarks (478-pt, 3D)         │ ✅ Done    │
 │ Segmentation (multiclass)            │ ✅ Done    │
-│ Pose / expression representation     │ ⏳ Next    │
-│ Identity representation              │ ⏳ Planned │
+│ Pose & expression representation     │ ✅ Done    │
+│ Identity representation              │ ⏳ Next    │
 │ Appearance transfer                  │ ⏳ Planned │
 │ Temporal stabilization               │ ⏳ Planned │
 │ Final real-time pipeline             │ ⏳ Planned │
@@ -827,15 +823,62 @@ Measured on real image `test_data/2face_validation.png` (820 × 400 px, 30 itera
 
 ---
 
-The next phase will add parametric head pose and expression representation on top of the
-existing detection, tracking, landmark, and segmentation pipeline.
+## Phase 1.5 — Pose & Expression Representation
+
+**Status: ✅ PASS**
+
+Implemented single-pass head pose estimation and facial expression representation
+extending the existing `MediaPipeLandmarker` pipeline.
+
+### Pose & Expression Architecture
+
+- **Single Pass:** Extracted concurrently during `FaceLandmarker` inference with `output_face_blendshapes=True` and `output_facial_transformation_matrixes=True`. Zero second model pass.
+- **Head Pose (Euler Angles):** Derived from the upper 3×3 rotation submatrix of MediaPipe's 4×4 metric transformation matrix using the ZYX intrinsic convention ($R = R_z(\text{roll}) \cdot R_y(\text{yaw}) \cdot R_x(\text{pitch})$).
+  - `pitch`: rotation around X-axis in degrees ($+ =$ look up, $- =$ look down)
+  - `yaw`: rotation around Y-axis in degrees ($+ =$ turn left, $- =$ turn right)
+  - `roll`: rotation around Z-axis in degrees ($+ =$ CCW tilt, $- =$ CW tilt)
+  - Gimbal Lock: Handled deterministically when $|R_{2,0}| \ge 0.999999$.
+- **Expression Representation:** 52 ARKit blendshape category scores stored as `Dict[str, float]`.
+- **Track Association:** Uses the exact single-pass Hungarian track matching from Phase 1.3 to produce `PoseResult[track_id]`.
+
+### Validation
+
+Unit and integration tests completed successfully:
+
+- Pose & Euler unit tests: **11/11 passed**
+- Full inference test suite: **77/77 passed**
+
+### Real-World Validation & Performance Benchmark
+
+Measured on real multi-face image `test_data/2face_validation.png` (820 × 400 px, 30 iterations, CPU / TFLite XNNPACK):
+
+| Metric | Phase 1.3 Baseline (Landmarks only) | Phase 1.5 (Landmarks + Pose + Blendshapes) |
+|---|---:|---:|
+| Minimum latency | 15.4 ms | **15.67 ms** |
+| Mean latency | 16.2 ms | **16.52 ms** |
+| Median latency | 16.1 ms | **16.40 ms** |
+| P95 latency | 17.5 ms | **17.38 ms** |
+| P99 latency | 18.8 ms | **18.76 ms** |
+| Maximum latency | 19.5 ms | **19.31 ms** |
+
+Enabling 52 blendshapes and 4×4 transformation matrix extraction in the existing `FaceLandmarker` pipeline adds less than **0.4 ms** total overhead.
+
+### Known Limitations
+
+- Body pose keypoints are deferred to a separate body-pose model outside Phase 1.5.
+- Pose accuracy relies on the subject's face being visible enough for MediaPipe landmark detection.
+
+---
+
+The next phase will add target identity representation and embedding extraction on top of the
+existing computer vision baseline pipeline.
 
 # Immediate Next Step
 
 The next development session should begin with:
 
 ```text
-Phase 1.5 — Pose & Expression Representation
+Phase 1.6 — Target Identity Representation
 ```
 
 # Project Philosophy

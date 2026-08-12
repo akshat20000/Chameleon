@@ -22,7 +22,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.landmarks.landmarker import BaseLandmarker, MediaPipeLandmarker
-from app.pipeline.result import BoundingBox, FaceDetection, LandmarkResult, TrackedFace
+from app.pipeline.result import BoundingBox, FaceDetection, LandmarkResult, PoseResult, TrackedFace
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -426,3 +426,149 @@ class Test478Landmarks:
             result = lm.detect(_DUMMY_IMAGE, [track])
 
         assert result[1].points_3d.shape[0] == 478
+
+
+# ---------------------------------------------------------------------------
+# 9. Euler angle conversion & Gimbal lock math tests
+# ---------------------------------------------------------------------------
+
+class TestEulerAngleConversion:
+    def test_identity_matrix_returns_zeros(self):
+        R = np.eye(3, dtype=np.float32)
+        pitch, yaw, roll = MediaPipeLandmarker.matrix_to_euler_zyx(R)
+        np.testing.assert_allclose([pitch, yaw, roll], [0.0, 0.0, 0.0], atol=1e-4)
+
+    def test_pure_pitch_30_degrees(self):
+        rad = np.radians(30.0)
+        c, s = np.cos(rad), np.sin(rad)
+        R = np.array([
+            [1.0, 0.0, 0.0],
+            [0.0, c, -s],
+            [0.0, s, c]
+        ], dtype=np.float32)
+        pitch, yaw, roll = MediaPipeLandmarker.matrix_to_euler_zyx(R)
+        np.testing.assert_allclose([pitch, yaw, roll], [30.0, 0.0, 0.0], atol=1e-4)
+
+    def test_pure_yaw_30_degrees(self):
+        rad = np.radians(30.0)
+        c, s = np.cos(rad), np.sin(rad)
+        R = np.array([
+            [c, 0.0, s],
+            [0.0, 1.0, 0.0],
+            [-s, 0.0, c]
+        ], dtype=np.float32)
+        pitch, yaw, roll = MediaPipeLandmarker.matrix_to_euler_zyx(R)
+        np.testing.assert_allclose([pitch, yaw, roll], [0.0, 30.0, 0.0], atol=1e-4)
+
+    def test_pure_roll_30_degrees(self):
+        rad = np.radians(30.0)
+        c, s = np.cos(rad), np.sin(rad)
+        R = np.array([
+            [c, -s, 0.0],
+            [s, c, 0.0],
+            [0.0, 0.0, 1.0]
+        ], dtype=np.float32)
+        pitch, yaw, roll = MediaPipeLandmarker.matrix_to_euler_zyx(R)
+        np.testing.assert_allclose([pitch, yaw, roll], [0.0, 0.0, 30.0], atol=1e-4)
+
+    def test_gimbal_lock_positive_90_yaw(self):
+        # R20 = -1.0 -> yaw = +90 deg
+        R = np.array([
+            [0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0],
+            [-1.0, 0.0, 0.0]
+        ], dtype=np.float32)
+        pitch, yaw, roll = MediaPipeLandmarker.matrix_to_euler_zyx(R)
+        assert np.isfinite(pitch) and np.isfinite(yaw) and np.isfinite(roll)
+        np.testing.assert_allclose(yaw, 90.0, atol=1e-4)
+        assert roll == 0.0
+
+    def test_gimbal_lock_negative_90_yaw(self):
+        # R20 = 1.0 -> yaw = -90 deg
+        R = np.array([
+            [0.0, 0.0, -1.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0]
+        ], dtype=np.float32)
+        pitch, yaw, roll = MediaPipeLandmarker.matrix_to_euler_zyx(R)
+        assert np.isfinite(pitch) and np.isfinite(yaw) and np.isfinite(roll)
+        np.testing.assert_allclose(yaw, -90.0, atol=1e-4)
+        assert roll == 0.0
+
+
+# ---------------------------------------------------------------------------
+# 10. Pose extraction & Blendshapes tests
+# ---------------------------------------------------------------------------
+
+def _make_fake_blendshapes(n: int = 52) -> List[MagicMock]:
+    categories = [
+        '_neutral', 'browDownLeft', 'browDownRight', 'browInnerUp', 'browOuterUpLeft',
+        'browOuterUpRight', 'cheekPuff', 'cheekSquintLeft', 'cheekSquintRight', 'eyeBlinkLeft',
+        'eyeBlinkRight', 'eyeLookDownLeft', 'eyeLookDownRight', 'eyeLookInLeft', 'eyeLookInRight',
+        'eyeLookOutLeft', 'eyeLookOutRight', 'eyeLookUpLeft', 'eyeLookUpRight', 'eyeSquintLeft',
+        'eyeSquintRight', 'jawForward', 'jawLeft', 'jawOpen', 'jawRight', 'mouthClose',
+        'mouthDimpleLeft', 'mouthDimpleRight', 'mouthFrownLeft', 'mouthFrownRight', 'mouthFunnel',
+        'mouthPressLeft', 'mouthPressRight', 'mouthPucker', 'mouthRight', 'mouthRollLower',
+        'mouthRollUpper', 'mouthShrugLower', 'mouthShrugUpper', 'mouthSmileLeft', 'mouthSmileRight',
+        'mouthLowerDownLeft', 'mouthLowerDownRight', 'mouthUpperUpLeft', 'mouthUpperUpRight',
+        'noseSneerLeft', 'noseSneerRight', 'tongueOut', 'eyeLookUpLeft_2', 'eyeLookUpRight_2',
+        'extra_1', 'extra_2'
+    ]
+    res = []
+    for i in range(n):
+        b = MagicMock()
+        b.category_name = categories[i] if i < len(categories) else f"cat_{i}"
+        b.score = float(0.01 * (i + 1))
+        res.append(b)
+    return res
+
+
+def _make_fake_matrix_4x4() -> np.ndarray:
+    return np.eye(4, dtype=np.float32)
+
+
+class TestPoseExtraction:
+    def test_detect_landmarks_and_pose_success(self, mocked_landmarker):
+        lm, mock_inner = mocked_landmarker
+        face_lms = _make_fake_face_landmarks(n=478)
+        bs_list = _make_fake_blendshapes(n=52)
+        mat_4x4 = _make_fake_matrix_4x4()
+
+        res_mock = MagicMock()
+        res_mock.face_landmarks = [face_lms]
+        res_mock.face_blendshapes = [bs_list]
+        res_mock.facial_transformation_matrixes = [mat_4x4]
+
+        mock_inner.detect.return_value = res_mock
+
+        track = _make_track(7, 0, 0, 640, 480)
+        with patch("mediapipe.Image"):
+            lms_dict, pose_dict = lm.detect_landmarks_and_pose(_DUMMY_IMAGE, [track])
+
+        assert 7 in lms_dict
+        assert 7 in pose_dict
+
+        pose = pose_dict[7]
+        assert isinstance(pose, PoseResult)
+        assert len(pose.blendshapes) == 52
+        assert pose.transformation_matrix.shape == (4, 4)
+        assert pose.transformation_matrix.dtype == np.float32
+
+        assert np.isfinite(pose.pitch)
+        assert np.isfinite(pose.yaw)
+        assert np.isfinite(pose.roll)
+        assert all(np.isfinite(val) for val in pose.blendshapes.values())
+        assert all(np.isfinite(val) for val in pose.transformation_matrix.flatten())
+
+    def test_detect_landmarks_and_pose_empty_tracks(self, mocked_landmarker):
+        lm, _ = mocked_landmarker
+        lms_dict, pose_dict = lm.detect_landmarks_and_pose(_DUMMY_IMAGE, [])
+        assert lms_dict == {}
+        assert pose_dict == {}
+
+    def test_detect_landmarks_and_pose_unready(self):
+        lm = MediaPipeLandmarker(model_path="/nonexistent/model.task")
+        lms_dict, pose_dict = lm.detect_landmarks_and_pose(_DUMMY_IMAGE, [_make_track(1, 0, 0, 10, 10)])
+        assert lms_dict == {}
+        assert pose_dict == {}
+
