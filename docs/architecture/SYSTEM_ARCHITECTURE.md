@@ -170,7 +170,7 @@ Input Frame
 │                      DETECTION MODULE                            │
 │  - Person detection (YOLOv8/RetinaFace)                         │
 │  - Face detection                                               │
-│  - Face landmark detection (498 points)                         │
+│  - Face landmark detection (478 points)                         │
 │  - Face parsing                                                 │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
