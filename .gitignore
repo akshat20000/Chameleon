@@ -7,3 +7,5 @@ services/inference/models/*.onnx
 services/inference/models/*.tflite
 services/inference/models/*.task
 services/inference/models/*.zip
+services/inference/models/*.tar
+services/inference/models/mobilefaceswap
