@@ -1,8 +1,10 @@
 # PerformerState Specification
 
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Status:** SPECIFICATION (Not yet implemented)  
-**Date:** 2026-08-19
+**Date:** 2026-08-19  
+**Changelog:**
+- v1.1.0 — Corrected segmentation class count (5 → 6) and added authoritative taxonomy table. Added `CanonicalMotionState` reference.
 
 ---
 
@@ -194,23 +196,38 @@ class SegmentationState:
     """
     Per-class segmentation masks for the performer.
 
-    All masks share the shape (H, W) and dtype bool unless noted.
+    Segmentation Taxonomy (selfie_multiclass_256x256.tflite)
+    ---------------------------------------------------------
+    This is the authoritative class definition. Do not use any other
+    mapping. The backend model provides exactly 6 classes (indices 0–5).
+
+        Index 0: background  → not included in any named mask
+        Index 1: hair        → hair_mask
+        Index 2: body-skin   → body_skin_mask  (exposed skin: neck, arms, hands)
+        Index 3: face-skin   → face_mask
+        Index 4: clothes     → clothes_mask    (accessible via class_mask==4)
+        Index 5: others      → accessible via class_mask==5 only
+
+    person_mask is the union of indices 1+2+3+4+5 (everything non-background).
+
+    All named boolean masks share shape (H, W), dtype bool.
+    class_mask has shape (H, W), dtype uint8, values in {0, 1, 2, 3, 4, 5}.
 
     Fields
     ------
     person_mask : np.ndarray, shape (H, W), bool
-        True = pixel belongs to any part of the performer.
-        Derived from union of hair + face + body_skin + clothes masks.
+        True = pixel belongs to any part of the performer (indices 1–5).
     face_mask : np.ndarray, shape (H, W), bool
-        Face skin pixels only.
+        Face skin pixels only (index 3).
     hair_mask : np.ndarray, shape (H, W), bool
-        Hair pixels.
+        Hair pixels (index 1).
     body_skin_mask : np.ndarray, shape (H, W), bool
-        Exposed body skin pixels (neck, arms, hands).
+        Exposed body skin (index 2): neck, arms, hands.
     clothes_mask : np.ndarray, shape (H, W), bool
-        Clothing pixels.
+        Clothing pixels (index 4).
     class_mask : np.ndarray, shape (H, W), uint8
-        Raw multi-class label map (values 0–5 from selfie_multiclass model).
+        Raw 6-class label map. Values: {0=background, 1=hair, 2=body-skin,
+        3=face-skin, 4=clothes, 5=others}.
     """
     person_mask: np.ndarray             # (H, W) bool
     face_mask: np.ndarray               # (H, W) bool
