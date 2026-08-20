@@ -52,6 +52,12 @@ def extract_aligned_face(image: np.ndarray, detector, tracker, landmarker):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Identity Encoder Smoke Test & Benchmark")
+    parser.add_argument("--image", help="Single face image path for identity benchmark")
+    parser.add_argument("--multi-image", help="Multi-face image path for inter-person comparison")
+    args = parser.parse_args()
+
     detector_model = Path("services/inference/models/blaze_face_short_range.tflite")
     landmarker_model = Path("services/inference/models/face_landmarker.task")
     identity_model = Path("services/inference/models/w600k_mbf.onnx")
@@ -74,15 +80,24 @@ def main():
         print("ERROR: IdentityEncoder is not ready. Aborting test.")
         sys.exit(1)
 
+    if not args.image:
+        print("\nNOTE: No input image provided via --image <path>. Skipping live image inference test.")
+        print("Model initialization verified successfully.")
+        return
+
     detector = MediaPipeDetector(model_path=str(detector_model))
     tracker = KalmanFilterTracker(min_hits=1)
     landmarker = MediaPipeLandmarker(model_path=str(landmarker_model))
 
-    img_single = cv2.imread("test_data/face.png")
-    assert img_single is not None, "Failed to load test_data/face.png"
+    img_single = cv2.imread(args.image)
+    if img_single is None:
+        print(f"ERROR: Failed to load image: {args.image}", file=sys.stderr)
+        sys.exit(1)
 
     chips_single = extract_aligned_face(img_single, detector, tracker, landmarker)
-    assert len(chips_single) > 0, "Failed to extract face chip from test_data/face.png"
+    if not chips_single:
+        print(f"ERROR: Failed to extract face chip from {args.image}", file=sys.stderr)
+        sys.exit(1)
     chip_single = list(chips_single.values())[0]
 
     print(f"  Face chip shape : {chip_single.shape} (dtype={chip_single.dtype})")
@@ -103,23 +118,25 @@ def main():
     print(f"  Latency             : {single_latency_ms:.2f} ms")
 
     # Multi-face image test (Person A vs Person B)
-    img_multi = cv2.imread("test_data/2face_validation.png")
-    chips_multi = extract_aligned_face(img_multi, detector, tracker, landmarker)
+    if args.multi_image:
+        img_multi = cv2.imread(args.multi_image)
+        if img_multi is not None:
+            chips_multi = extract_aligned_face(img_multi, detector, tracker, landmarker)
 
-    embs_multi = {}
-    for tid, chip in chips_multi.items():
-        embs_multi[tid] = encoder.extract_embedding(chip)
+            embs_multi = {}
+            for tid, chip in chips_multi.items():
+                embs_multi[tid] = encoder.extract_embedding(chip)
 
-    print("\n--------------------------------------------------------------------")
-    print("  MULTI-FACE EMBEDDING & COSINE SIMILARITY TEST")
-    print("--------------------------------------------------------------------")
-    for tid, emb in embs_multi.items():
-        print(f"  Track ID {tid}: shape={emb.shape}, norm={np.linalg.norm(emb):.6f}")
+            print("\n--------------------------------------------------------------------")
+            print("  MULTI-FACE EMBEDDING & COSINE SIMILARITY TEST")
+            print("--------------------------------------------------------------------")
+            for tid, emb in embs_multi.items():
+                print(f"  Track ID {tid}: shape={emb.shape}, norm={np.linalg.norm(emb):.6f}")
 
-    if len(embs_multi) >= 2:
-        tids = list(embs_multi.keys())
-        sim_diff = cosine_similarity(embs_multi[tids[0]], embs_multi[tids[1]])
-        print(f"\n  Cosine Similarity (Person {tids[0]} vs Person {tids[1]} - DIFFERENT PERSONS): {sim_diff:.4f}")
+            if len(embs_multi) >= 2:
+                tids = list(embs_multi.keys())
+                sim_diff = cosine_similarity(embs_multi[tids[0]], embs_multi[tids[1]])
+                print(f"\n  Cosine Similarity (Person {tids[0]} vs Person {tids[1]} - DIFFERENT PERSONS): {sim_diff:.4f}")
 
     # Same person rotated comparison
     h, w = img_single.shape[:2]

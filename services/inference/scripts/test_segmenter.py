@@ -78,17 +78,15 @@ def main():
     img_path = None
     if args.image:
         img_path = Path(args.image)
-    else:
-        repo_root = Path(__file__).resolve().parent.parent.parent.parent
-        candidate = repo_root / "test_data" / "2face_validation.png"
-        if candidate.exists():
-            img_path = candidate
+        if not img_path.exists():
+            print(f"ERROR: Image path not found: {img_path}", file=sys.stderr)
+            sys.exit(1)
 
-    if img_path and img_path.exists():
+    if img_path:
         print(f"  Loading image : {img_path}")
         image = cv2.imread(str(img_path))
     else:
-        print("  Generating synthetic 640x480 image for smoke test...")
+        print("  No image provided via argument. Generating synthetic 640x480 image for smoke test...")
         image = np.zeros((480, 640, 3), dtype=np.uint8)
         # Draw a synthetic face/person
         cv2.circle(image, (320, 200), 80, (200, 180, 150), -1) # face/head
@@ -126,25 +124,25 @@ def main():
         pct = (count / total_pixels) * 100.0
         print(f"    Class {class_id} ({lbl:<10}) : {count:>8} px  ({pct:>6.2f}%)")
 
-    # Save visualization if test_data dir is available
-    if img_path:
-        out_dir = img_path.parent
-        out_path = out_dir / "_segmentation_smoke_out.png"
-        
-        # Colorize class mask
-        color_map = np.array([
-            [0, 0, 0],       # 0: background (black)
-            [255, 0, 0],     # 1: hair (blue)
-            [0, 255, 0],     # 2: body-skin (green)
-            [0, 255, 255],   # 3: face-skin (yellow)
-            [0, 0, 255],     # 4: clothes (red)
-            [255, 0, 255],   # 5: others (magenta)
-        ], dtype=np.uint8)
-        
-        vis_mask = color_map[np.clip(result.class_mask, 0, 5)]
-        blended = cv2.addWeighted(image, 0.5, vis_mask, 0.5, 0)
-        cv2.imwrite(str(out_path), blended)
-        print(f"\n  Saved visualization to: {out_path}")
+    # Save visualization to test_data/outputs/
+    out_dir = Path(__file__).resolve().parent.parent.parent / "test_data" / "outputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "segmentation_smoke_out.png"
+    
+    # Colorize class mask
+    color_map = np.array([
+        [0, 0, 0],       # 0: background (black)
+        [255, 0, 0],     # 1: hair (blue)
+        [0, 255, 0],     # 2: body-skin (green)
+        [0, 255, 255],   # 3: face-skin (yellow)
+        [0, 0, 255],     # 4: clothes (red)
+        [255, 0, 255],   # 5: others (magenta)
+    ], dtype=np.uint8)
+    
+    vis_mask = color_map[np.clip(result.class_mask, 0, 5)]
+    blended = cv2.addWeighted(image, 0.5, vis_mask, 0.5, 0)
+    cv2.imwrite(str(out_path), blended)
+    print(f"\n  Saved visualization to: {out_path}")
 
     segmenter.close()
     print("\n  Smoke test finished successfully!")

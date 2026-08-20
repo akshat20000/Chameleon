@@ -2,5 +2,8 @@
 __pycache__
 CLAUDE.md
 .claude
-test_data
 services/inference/models/
+
+# Test data ignore rules
+test_data/outputs/*
+!test_data/outputs/.gitkeep

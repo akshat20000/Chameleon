@@ -806,7 +806,7 @@ Unit and integration tests completed successfully:
 
 ### Real-World Validation & Performance Benchmark
 
-Measured on real image `test_data/2face_validation.png` (820 × 400 px, 30 iterations, CPU / TFLite XNNPACK):
+Measured on pre-reset historical image `2face_validation.png` (820 × 400 px, 30 iterations, CPU / TFLite XNNPACK):
 
 | Metric | Result |
 |---|---:|
@@ -852,7 +852,7 @@ Unit and integration tests completed successfully:
 
 ### Real-World Validation & Performance Benchmark
 
-Measured on real multi-face image `test_data/2face_validation.png` (820 × 400 px, 30 iterations, CPU / TFLite XNNPACK):
+Measured on pre-reset historical multi-face image `2face_validation.png` (820 × 400 px, 30 iterations, CPU / TFLite XNNPACK):
 
 | Metric | Phase 1.3 Baseline (Landmarks only) | Phase 1.5 (Landmarks + Pose + Blendshapes) |
 |---|---:|---:|
@@ -894,7 +894,7 @@ Unit tests and real-world benchmarks completed successfully:
 - Identity unit tests: **17/17 passed**
 - Full test suite: **94/94 passed**
 
-Measured on real images (`test_data/face.png` & `test_data/2face_validation.png`):
+Measured on pre-reset historical images (`face.png` & `2face_validation.png`):
 
 | Metric | Measured Value | Context |
 |---|---:|---|

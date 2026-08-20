@@ -44,12 +44,7 @@ HAND_LANDMARKER_PATH   = str(MODELS_DIR / "hand_landmarker.task")
 SEGMENTER_MODEL_PATH   = str(MODELS_DIR / "selfie_multiclass_256x256.tflite")
 DETECTOR_MODEL_PATH    = str(MODELS_DIR / "blaze_face_short_range.tflite")
 
-# ── test image ────────────────────────────────────────────────────────────────
-TEST_IMAGE_PATH = str(PROJECT_ROOT / "test_data" / "2face_validation.png")
-
-# ── output dir ────────────────────────────────────────────────────────────────
-OUT_DIR = PROJECT_ROOT / "test_data" / "phase2_motion"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+DEFAULT_OUT_DIR = PROJECT_ROOT / "test_data" / "outputs" / "phase2_motion"
 
 N_BENCHMARK_ITERS = 30
 
@@ -236,7 +231,7 @@ def draw_head_orientation(canvas: np.ndarray, face_result, h: int, w: int):
 # Main benchmark and extraction routine
 # ==============================================================================
 
-def run_extraction_and_benchmark(bgr: np.ndarray) -> dict:
+def run_extraction_and_benchmark(bgr: np.ndarray, out_dir: Path = DEFAULT_OUT_DIR) -> dict:
     h, w = bgr.shape[:2]
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
@@ -385,7 +380,7 @@ def run_extraction_and_benchmark(bgr: np.ndarray) -> dict:
         cv2.putText(canvas, line, (10, y),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
-    debug_overlay_path = str(OUT_DIR / "debug_overlay.png")
+    debug_overlay_path = str(out_dir / "debug_overlay.png")
     cv2.imwrite(debug_overlay_path, canvas)
     print(f"  Saved debug overlay: {debug_overlay_path}")
 
@@ -393,20 +388,29 @@ def run_extraction_and_benchmark(bgr: np.ndarray) -> dict:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Phase 2.2 — Performer Motion Extraction Prototype")
+    parser.add_argument("--image", required=True, help="Input performer image path")
+    parser.add_argument("--output-dir", default=str(DEFAULT_OUT_DIR), help="Output directory")
+    args = parser.parse_args()
+
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     print("=" * 72)
     print("  Phase 2.2 — Performer Motion Extraction Prototype")
     print("=" * 72)
 
-    bgr = cv2.imread(TEST_IMAGE_PATH)
+    bgr = cv2.imread(args.image)
     if bgr is None:
-        raise FileNotFoundError(f"Test image not found: {TEST_IMAGE_PATH}")
-    print(f"Loaded test image: {TEST_IMAGE_PATH}  ({bgr.shape[1]}x{bgr.shape[0]})")
+        raise FileNotFoundError(f"Input image not found: {args.image}")
+    print(f"Loaded input image: {args.image}  ({bgr.shape[1]}x{bgr.shape[0]})")
 
-    benchmark, extraction = run_extraction_and_benchmark(bgr)
+    benchmark, extraction = run_extraction_and_benchmark(bgr, out_dir=out_dir)
 
     # ── save JSON reports ──────────────────────────────────────────────────────
-    bench_path = str(OUT_DIR / "benchmark_report.json")
-    state_path = str(OUT_DIR / "performer_state_summary.json")
+    bench_path = str(out_dir / "benchmark_report.json")
+    state_path = str(out_dir / "performer_state_summary.json")
 
     with open(bench_path, "w") as f:
         json.dump(benchmark, f, indent=2)
@@ -435,7 +439,7 @@ def main():
     print(f"\n  Estimated FPS (pipeline total): {benchmark['fps_estimate']:.1f}")
     print(f"\n  Benchmark JSON:  {bench_path}")
     print(f"  State summary:   {state_path}")
-    print(f"  Debug overlay:   {OUT_DIR / 'debug_overlay.png'}")
+    print(f"  Debug overlay:   {out_dir / 'debug_overlay.png'}")
 
 
 if __name__ == "__main__":

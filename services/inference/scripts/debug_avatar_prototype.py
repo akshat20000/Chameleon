@@ -59,8 +59,7 @@ from app.motion.canonical_state import CanonicalMotionState, BodyPose, JointStat
 from app.motion.mediapipe_adapter import adapt_performer_state
 
 MODELS_DIR  = PROJECT_ROOT / "services" / "inference" / "models"
-TEST_IMAGE  = PROJECT_ROOT / "test_data" / "2face_validation.png"
-OUT_DIR     = PROJECT_ROOT / "test_data" / "phase2_motion_retargeting"
+DEFAULT_OUT_DIR = PROJECT_ROOT / "test_data" / "outputs" / "phase2_motion_retargeting"
 
 N_BENCHMARK_ITERS = 30
 
@@ -600,9 +599,15 @@ def benchmark_pipeline(bgr: np.ndarray) -> Tuple[CanonicalMotionState, dict]:
 
 def main():
     parser = argparse.ArgumentParser(description="Phase 2.4A debug avatar prototype")
-    parser.add_argument("--image", default=str(TEST_IMAGE), help="Input image path")
+    parser.add_argument("--image", required=True, help="Input performer image path")
+    parser.add_argument(
+        "--output-dir",
+        default=str(DEFAULT_OUT_DIR),
+        help="Output directory (defaults to test_data/outputs/phase2_motion_retargeting)",
+    )
     args = parser.parse_args()
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 72)
     print("  Phase 2.4A — Debug Avatar Prototype")
@@ -705,11 +710,11 @@ def main():
                     FONT, 0.6, (255, 220, 80), 2, cv2.LINE_AA)
 
     # ── Save outputs ─────────────────────────────────────────────────────────
-    overlay_path     = str(OUT_DIR / "debug_avatar_overlay.png")
-    clean_path       = str(OUT_DIR / "debug_avatar_clean.png")
-    sbs_path         = str(OUT_DIR / "side_by_side.png")
-    state_path       = str(OUT_DIR / "canonical_state.json")
-    metrics_path     = str(OUT_DIR / "metrics.json")
+    overlay_path     = str(out_dir / "debug_avatar_overlay.png")
+    clean_path       = str(out_dir / "debug_avatar_clean.png")
+    sbs_path         = str(out_dir / "side_by_side.png")
+    state_path       = str(out_dir / "canonical_state.json")
+    metrics_path     = str(out_dir / "metrics.json")
 
     cv2.imwrite(overlay_path, overlay_canvas)
     cv2.imwrite(clean_path, clean_canvas)
