@@ -320,16 +320,22 @@ def adapt_body_pose(
         neck_conf = min(chest_joint.confidence, head_j.confidence)
         neck_joint = _make_joint(neck_pos, neck_conf)
 
-    # Add rotations to arm and leg bones
+    # Add rotations to arm and leg bones using canonical reference directions
     def _with_rotation(
         parent_j: Optional[JointState],
         child_j: Optional[JointState],
+        ref_dir: np.ndarray = np.array([0.0, 1.0, 0.0], dtype=np.float32),
     ) -> Optional[JointState]:
         """Return child_j with a rotation matrix computed from parent→child bone."""
         if parent_j is None or child_j is None:
             return child_j
-        R = _bone_rotation(parent_j.position, child_j.position)
+        R = _bone_rotation(parent_j.position, child_j.position, reference_direction=ref_dir)
         return JointState(position=child_j.position, rotation=R, confidence=child_j.confidence)
+
+    REF_LEFT_ARM  = np.array([1.0, 0.0, 0.0], dtype=np.float32)   # T-pose left arm: +X
+    REF_RIGHT_ARM = np.array([-1.0, 0.0, 0.0], dtype=np.float32)  # T-pose right arm: -X
+    REF_LEG       = np.array([0.0, -1.0, 0.0], dtype=np.float32)  # Standing leg: -Y
+    REF_SPINE     = np.array([0.0, 1.0, 0.0], dtype=np.float32)   # Upward spine: +Y
 
     ls = _joint(_LM_LEFT_SHOULDER)
     le = _joint(_LM_LEFT_ELBOW)
@@ -348,18 +354,18 @@ def adapt_body_pose(
         chest         = chest_joint,
         neck          = neck_joint,
         head          = head_j,
-        left_shoulder = _with_rotation(chest_joint, ls),
-        left_elbow    = _with_rotation(ls, le),
-        left_wrist    = _with_rotation(le, lw),
-        right_shoulder = _with_rotation(chest_joint, rs),
-        right_elbow   = _with_rotation(rs, re),
-        right_wrist   = _with_rotation(re, rw),
+        left_shoulder = _with_rotation(chest_joint, ls, REF_LEFT_ARM),
+        left_elbow    = _with_rotation(ls, le, REF_LEFT_ARM),
+        left_wrist    = _with_rotation(le, lw, REF_LEFT_ARM),
+        right_shoulder = _with_rotation(chest_joint, rs, REF_RIGHT_ARM),
+        right_elbow   = _with_rotation(rs, re, REF_RIGHT_ARM),
+        right_wrist   = _with_rotation(re, rw, REF_RIGHT_ARM),
         left_hip      = left_hip_j,
-        left_knee     = _with_rotation(left_hip_j, lk),
-        left_ankle    = _with_rotation(lk, la),
+        left_knee     = _with_rotation(left_hip_j, lk, REF_LEG),
+        left_ankle    = _with_rotation(lk, la, REF_LEG),
         right_hip     = right_hip_j,
-        right_knee    = _with_rotation(right_hip_j, rk),
-        right_ankle   = _with_rotation(rk, ra),
+        right_knee    = _with_rotation(right_hip_j, rk, REF_LEG),
+        right_ankle   = _with_rotation(rk, ra, REF_LEG),
     )
 
 
