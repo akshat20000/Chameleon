@@ -385,4 +385,37 @@ class CanonicalMotionState:
                     f"right.x={rs.position[0]:.3f} > left.x={ls.position[0]:.3f}"
                 )
 
+        # Vertical anatomical hierarchy check (Canonical +Y is UPWARD)
+        # Required order: head > neck > chest > pelvis (0.0) > knees > ankles
+        head = self.body.head
+        chest = self.body.chest
+        pelvis = self.body.pelvis
+
+        if head is not None and head.is_visible and pelvis is not None:
+            if head.position[1] <= pelvis.position[1]:
+                errors.append(
+                    f"vertical hierarchy inversion: head.y ({head.position[1]:.3f}) <= pelvis.y ({pelvis.position[1]:.3f})"
+                )
+
+        if chest is not None and chest.is_visible and pelvis is not None:
+            if chest.position[1] <= pelvis.position[1]:
+                errors.append(
+                    f"vertical hierarchy inversion: chest.y ({chest.position[1]:.3f}) <= pelvis.y ({pelvis.position[1]:.3f})"
+                )
+
+        for side, knee, ankle in [
+            ("left", self.body.left_knee, self.body.left_ankle),
+            ("right", self.body.right_knee, self.body.right_ankle),
+        ]:
+            if knee is not None and knee.is_visible and pelvis is not None:
+                if knee.position[1] >= pelvis.position[1]:
+                    errors.append(
+                        f"vertical hierarchy inversion: {side}_knee.y ({knee.position[1]:.3f}) >= pelvis.y ({pelvis.position[1]:.3f})"
+                    )
+            if ankle is not None and ankle.is_visible and knee is not None and knee.is_visible:
+                if ankle.position[1] >= knee.position[1]:
+                    errors.append(
+                        f"vertical hierarchy inversion: {side}_ankle.y ({ankle.position[1]:.3f}) >= {side}_knee.y ({knee.position[1]:.3f})"
+                    )
+
         return errors

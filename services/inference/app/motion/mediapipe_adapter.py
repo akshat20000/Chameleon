@@ -135,7 +135,10 @@ def _make_joint_optional(
     # MediaPipe world landmarks are already hip-centred, but we subtract
     # our computed pelvis to be explicit about the origin.
     pos_canon = (pos_metric - pelvis) / max(scale, 1e-6)
-    # Flip Z so +Z is toward camera (MediaPipe world Z points away from camera)
+    # MediaPipe world coordinates use +Y pointing DOWNWARD (toward ground)
+    # and +Z pointing AWAY from camera (into screen).
+    # CanonicalMotionState requires +Y UPWARD and +Z TOWARD camera.
+    pos_canon[1] = -pos_canon[1]
     pos_canon[2] = -pos_canon[2]
     return _make_joint(pos_canon, conf)
 
@@ -237,6 +240,7 @@ def _build_finger_state(
     def _fj(idx: int) -> JointState:
         pos_metric = hand_lms_world[idx, :3].astype(np.float32)
         pos_canon = (pos_metric - wrist_world) / max(scale, 1e-6)
+        pos_canon[1] = -pos_canon[1]
         pos_canon[2] = -pos_canon[2]
         # MediaPipe hand landmark confidence: no per-landmark visibility,
         # use presence threshold of 1.0 as default
@@ -291,7 +295,8 @@ def adapt_body_pose(
             return None
         pa = (_lm_pos(body_lms, idx_a) - pelvis_metric) / max(scale, 1e-6)
         pb = (_lm_pos(body_lms, idx_b) - pelvis_metric) / max(scale, 1e-6)
-        pa[2] = -pa[2];  pb[2] = -pb[2]
+        pa[1] = -pa[1];  pa[2] = -pa[2]
+        pb[1] = -pb[1];  pb[2] = -pb[2]
         mid_conf = (conf_a + conf_b) / 2.0
         return _make_joint(_midpoint(pa, pb), mid_conf)
 

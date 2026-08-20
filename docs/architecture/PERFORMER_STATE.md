@@ -74,6 +74,20 @@ Units: degrees
 Range: pitch ∈ [-180, 180], yaw ∈ [-90, 90], roll ∈ [-180, 180]
 ```
 
+### 3.5 Canonical Motion State Coordinate System
+
+See [ADR-004: Canonical Motion Coordinate System & Transformation Contract](file:///e:/My_personal/Projects/ongoing/Chameleon/docs/architecture/ADR/ADR-004-canonical-coordinate-system.md).
+
+```text
+Origin: Pelvis (midpoint of hips) = (0.0, 0.0, 0.0)
++X: Camera Right (performer left for front camera)
++Y: UPWARD (away from floor / toward head)
++Z: TOWARD camera (out of chest)
+Units: Body height normalized (1.0 = standing height)
+```
+
+Vertical Hierarchy Contract: `head.y > neck.y > chest.y > pelvis.y (0.0) > knee.y > ankle.y`
+
 ---
 
 ## 4. Data Schema (Python Dataclasses)

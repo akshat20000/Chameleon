@@ -30,17 +30,20 @@ The adapter that converts `PerformerState` → `CanonicalMotionState` is the sin
 
 ### 3.1 World Coordinate System
 
-```
-Origin:    Pelvis (midpoint of left_hip and right_hip landmarks)
-+Y axis:   Upward (away from the floor)
-+X axis:   Right (performer's anatomical right — i.e., rightward from performer's perspective)
+See [ADR-004: Canonical Motion Coordinate System & Transformation Contract](file:///e:/My_personal/Projects/ongoing/Chameleon/docs/architecture/ADR/ADR-004-canonical-coordinate-system.md).
+
+```text
+Origin:    Pelvis (midpoint of left_hip and right_hip landmarks) = (0.0, 0.0, 0.0)
++Y axis:   Upward (away from the floor / toward sky)
++X axis:   Camera Right (performer's anatomical left in front-facing camera)
 +Z axis:   Forward (toward the camera, out of the performer's chest)
 Handedness: Right-handed
 Units:     Normalized body height
            1.0 unit ≈ full standing body height of the performer.
-           Derived from |ankle_midpoint - top_of_head| when both are visible.
-           Falls back to |hip_midpoint - shoulder_midpoint| * 2.0 when head/ankles are missing.
 ```
+
+**Anatomical Vertical Hierarchy Contract (+Y Upward):**
+$$\text{head.y} > \text{neck.y} > \text{chest.y} > \text{pelvis.y } (0.0) > \text{knee.y} > \text{ankle.y}$$
 
 ### 3.2 Joint Rotation Convention
 
