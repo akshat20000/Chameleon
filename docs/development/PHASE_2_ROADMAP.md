@@ -236,18 +236,27 @@ For each consecutive frame pair (t-1, t):
 | Left/right inversion events | 0 | Any inversion is a failure |
 | NaN/Inf events | 0 | Any occurrence is a failure |
 
-**Exit Gates (all must pass):**
+**Exit Gates & Baseline Measurement (1,075 frames @ 29.6 FPS):**
 
-| Gate | Requirement |
-|---|---|
-| Temporal position smoothness | No sudden positional jumps across the sequence |
-| No rotation flips | No sudden 90+ degree rotation discontinuities |
-| Left/right consistency | No inversion events across the full sequence |
-| Confidence stability | No joints that appear/disappear erratically |
-| NaN-free across all frames | Zero NaN or Inf values in any frame |
+| Gate | Requirement | Baseline Result (Raw Tracker) | Status |
+|---|---|---|---|
+| Temporal position smoothness | No sudden jumps > 0.10 units | **112 jump events** | FAIL ❌ |
+| No rotation flips | No sudden rotation jumps > 45° | **13 flip events** | FAIL ❌ |
+| Confidence stability | Drop rate <= 5.0% | **0.05% drop rate** | PASS ✅ |
+| Left/right consistency | 0 camera-space inversions | **30 inversion events** | FAIL ❌ |
+| NaN-free across all frames | 0 NaN/Inf values | **0 events** | PASS ✅ |
+
+**Rotation Flip Root-Cause Audit (14 → 195 → 13 events):**
+- **14 events (Initial un-negated Y run):** Arms hanging down pointed along `+Y` (`[0, +1, 0]`). `reference_direction` (`[0, 1, 0]`) and bone vector were parallel (0° angle, no singularity).
+- **195 events (Second run after Y negation):** Arms hanging down pointed along `-Y` (`[0, -1, 0]`). Hardcoded `ref_dir = [0, 1, 0]` became **anti-parallel (180° opposite)**, placing every arm at rest directly on top of the 180° Rodrigues gimbal lock singularity! 1mm tracking noise caused 180° orthogonal rotation flips.
+- **13 events (Third run after anatomical ref dirs):** Passing anatomical T-pose reference directions per bone (arms=[±1,0,0], legs=[0,-1,0], spine=[0,1,0]) completely eliminated the gimbal lock singularity, reducing flips to **13 genuine tracker events**.
 
 **Deliverables:**
-- [ ] `validate_temporal_stability.py` script (video in -> per-frame metrics out)
+- [x] `services/inference/scripts/validate_temporal_stability.py` script
+- [x] Performer video asset: `test_data/inputs/performer/WhatsApp Video 2026-08-20 at 10.16.06 PM.mp4`
+- [x] Baseline run metrics: `test_data/outputs/2026-08-20_temporal_stability/temporal_stability_report.json`
+- [x] Baseline overlay video: `test_data/outputs/2026-08-20_temporal_stability/skeleton_overlay.mp4`
+- [ ] Temporal Stabilization Stage (e.g. 1€-Filter / Exponential Moving Average / Hysteresis filter)
 - [ ] Stability report: per-joint position variance, flip count, confidence drop rate
 - [ ] Video output: source video with debug skeleton overlaid on each frame
 
