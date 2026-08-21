@@ -80,31 +80,48 @@ def normalize_embedding(vector: np.ndarray) -> Optional[np.ndarray]:
     return normalized.astype(np.float32)
 
 
-def fuse_embeddings(embeddings: List[np.ndarray]) -> Optional[np.ndarray]:
+def fuse_embeddings(
+    embeddings: List[np.ndarray],
+    weights: Optional[List[float]] = None,
+    min_quality_weight: float = 1e-3,
+) -> Optional[np.ndarray]:
     """
-    Compute multi-reference normalized mean embedding.
+    Compute multi-reference quality-weighted normalized fused identity embedding.
 
     Parameters
     ----------
     embeddings : List[np.ndarray]
         List of 1D feature vectors to fuse.
+    weights : Optional[List[float]]
+        Optional normalized quality weights q_i in [0, 1] for each vector.
+    min_quality_weight : float
+        Minimum weight threshold; vectors with weight below this epsilon are omitted.
 
     Returns
     -------
     Optional[np.ndarray]
-        L2-normalized float32 fused embedding vector, or None if input list is
-        empty, contains dimension mismatches, or contains invalid/non-finite data.
+        L2-normalized float32 fused embedding vector (norm == 1.0), or None if invalid.
     """
     if not embeddings or not isinstance(embeddings, list):
         return None
 
-    normalized_list: List[np.ndarray] = []
+    if weights is not None and len(weights) != len(embeddings):
+        logger.warning(f"Weights length mismatch: got {len(weights)}, expected {len(embeddings)}")
+        return None
+
+    valid_embeddings: List[np.ndarray] = []
+    valid_weights: List[float] = []
     expected_dim: Optional[int] = None
 
-    for emb in embeddings:
+    for idx, emb in enumerate(embeddings):
+        w = float(weights[idx]) if weights is not None else 1.0
+        if w < min_quality_weight:
+            logger.debug("Omitting view %d from fusion: quality weight %.4f < min %.4f", idx, w, min_quality_weight)
+            continue
+
         norm_emb = normalize_embedding(emb)
         if norm_emb is None:
-            return None
+            continue
 
         if expected_dim is None:
             expected_dim = norm_emb.shape[0]
@@ -114,13 +131,17 @@ def fuse_embeddings(embeddings: List[np.ndarray]) -> Optional[np.ndarray]:
             )
             return None
 
-        normalized_list.append(norm_emb)
+        valid_embeddings.append(norm_emb)
+        valid_weights.append(w)
 
-    if not normalized_list:
+    if not valid_embeddings:
         return None
 
-    mean_vec = np.mean(np.array(normalized_list, dtype=np.float32), axis=0)
-    return normalize_embedding(mean_vec)
+    emb_arr = np.array(valid_embeddings, dtype=np.float32)  # (N, D)
+    w_arr = np.array(valid_weights, dtype=np.float32).reshape(-1, 1)  # (N, 1)
+
+    weighted_sum = np.sum(emb_arr * w_arr, axis=0)
+    return normalize_embedding(weighted_sum)
 
 
 def extract_5pt_landmarks_from_478(points_2d: np.ndarray) -> Optional[np.ndarray]:

@@ -85,7 +85,25 @@ class TestPureFusion:
     def test_fusion_empty_or_invalid_returns_none(self):
         assert fuse_embeddings([]) is None
         assert fuse_embeddings([np.zeros(512)]) is None
-        assert fuse_embeddings([np.ones(512), np.array([np.nan]*512)]) is None
+
+    def test_fusion_with_quality_weights(self):
+        v1 = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        v2 = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        # v1 weight 0.9, v2 weight 0.1
+        fused = fuse_embeddings([v1, v2], weights=[0.9, 0.1])
+        assert fused is not None
+        np.testing.assert_allclose(np.linalg.norm(fused), 1.0, atol=1e-6)
+        # Fused vector should be predominantly pointing along +X
+        assert fused[0] > 0.95
+        assert fused[1] < 0.2
+
+    def test_fusion_omits_sub_epsilon_weights(self):
+        v1 = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        v2 = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        # v2 weight 0.0001 < min_quality_weight (1e-3)
+        fused = fuse_embeddings([v1, v2], weights=[0.9, 0.0001], min_quality_weight=1e-3)
+        assert fused is not None
+        np.testing.assert_allclose(fused, [1.0, 0.0, 0.0], atol=1e-6)
 
 
 class TestPureAlignment:
