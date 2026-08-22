@@ -11,8 +11,10 @@ The long-term goal is a **high-fidelity, low-latency real-time identity/appearan
 > dense facial landmarks & 3D pose (478-pt MediaPipe FaceLandmarker),
 > semantic face & body segmentation (MediaPipe ImageSegmenter multiclass),
 > parametric pose & expression representation (Euler pitch/yaw/roll + 52 ARKit blendshapes),
-> target identity representation & feature encoder (ArcFace MobileFaceNet 512-dim ONNX)
-> **Next:** Appearance transfer
+> kinematic motion retargeting & controllable debug avatar engine (Phase 2.4D - 10/10 gates PASS),
+> reference identity preparation pipeline (Phase 2.3 - compiles validated, versioned identity assets),
+> appearance conditioning & baseline engine (Phase 2.5A - ADR-006, read-only kinematic boundary, multi-region articulated baseline renderer, 166 workspace tests PASS).
+> **Next Target:** Phase 2.5B — Neural Synthesis Backend Evaluation & Real-Person Benchmarking.
 
 ---
 

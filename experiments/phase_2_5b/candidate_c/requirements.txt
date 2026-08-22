@@ -1,0 +1,9 @@
+# Candidate C (ControlNet + IP-Adapter Diffusion Stack) Requirements
+diffusers>=0.25.0
+transformers>=4.36.0
+accelerate>=0.25.0
+huggingface_hub>=0.20.0
+torch>=2.0.0
+safetensors>=0.4.0
+pillow>=9.5.0
+opencv-python>=4.8.0

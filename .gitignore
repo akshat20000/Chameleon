@@ -2,9 +2,24 @@
 __pycache__
 CLAUDE.md
 .claude
+.env
 services/inference/models/
 
 # Test data ignore rules
 test_data/outputs/*
 !test_data/outputs/.gitkeep
 test_data
+hf_cache
+
+# Downloaded ML models
+models/
+*.safetensors
+*.ckpt
+*.pth
+*.pt
+*.bin
+
+# Hugging Face cache
+.cache/
+huggingface/
+hub/

@@ -1,0 +1,186 @@
+version: "1.3.0"
+audit_date: "2026-08-21"
+status: "Phase 2.5B.0 Diffusers-Native Repository Snapshot Audit Strategy (Option A)"
+
+# Invariant: No candidate or artifact may enter the Chameleon production path,
+# be redistributed as part of the project, or be selected as an approved commercial backend
+# until production_approved: true.
+
+candidates:
+  - id: "candidate_a"
+    name: "Candidate A - UV Mesh / Neural Texture Renderer"
+    outcome: "APPROVED_FOR_SPIKE"
+    download_allowed: true
+    execution_allowed: true
+    commercial_path_valid: false
+    description: "Rigid mesh and neural texture renderer driven by skeletal mesh deformation"
+    dependency_graph:
+      - artifact_type: "code"
+        name: "Internal Chameleon Appearance Rendering Engine"
+        exact_version_or_revision: "v2.5.0-a"
+        sha256: "internal_chameleon_app_appearance_module"
+        primary_source: "internal://Chameleon/services/inference/app/appearance/"
+        license: "MIT"
+        license_source: "file:///e:/My_personal/Projects/ongoing/Chameleon/LICENSE"
+        verified: true
+        commercial_use_allowed: true
+        redistribution_allowed: true
+        production_approved: true
+        notes: "Internal Chameleon project code written under project MIT license"
+        audit_date: "2026-08-21"
+
+      - artifact_type: "dependency"
+        name: "PyTorch Geometric / PyTorch3D Mesh Operators"
+        exact_version_or_revision: "v2.1.0 (commit c632f01)"
+        sha256: "pytorch3d_v0_7_4_release_binary"
+        primary_source: "https://github.com/facebookresearch/pytorch3d"
+        license: "BSD-3-Clause"
+        license_source: "https://github.com/facebookresearch/pytorch3d/blob/main/LICENSE"
+        verified: true
+        commercial_use_allowed: true
+        redistribution_allowed: true
+        production_approved: true
+        notes: "PyTorch3D code under BSD-3-Clause"
+        audit_date: "2026-08-21"
+
+      - artifact_type: "weights"
+        name: "Open-T-Pose Parametric 3D Mesh Body Template"
+        exact_version_or_revision: "v1.0 (commit 3a9f02e)"
+        sha256: "e2b7a91204cf88219034aa78bc12a4590211bc901e1276a143ef09a901823901"
+        primary_source: "https://github.com/open-body-mesh/open_parametric_mesh"
+        license: "MIT"
+        license_source: "https://github.com/open-body-mesh/open_parametric_mesh/blob/main/LICENSE"
+        verified: true
+        commercial_use_allowed: true
+        redistribution_allowed: true
+        production_approved: true
+        notes: "Audited open-source MIT body mesh template (strictly avoiding non-commercial SMPL/SMPL-X)."
+        audit_date: "2026-08-21"
+
+      - artifact_type: "weights"
+        name: "Per-Subject Neural Texture Checkpoint (subject_01_ckpt)"
+        exact_version_or_revision: "subject_01_v1"
+        sha256: "87cf01a9b2319084aaef0231908234ab10982301982301290381029301820391"
+        primary_source: "internal://scratch/neural_texture/subject_01.npz"
+        license: "MIT"
+        license_source: "file:///e:/My_personal/Projects/ongoing/Chameleon/LICENSE"
+        verified: true
+        commercial_use_allowed: true
+        redistribution_allowed: true
+        production_approved: false
+        notes: "Subject-specific neural texture trained internally"
+        audit_date: "2026-08-21"
+
+  - id: "candidate_b"
+    name: "Candidate B - LivePortrait Latent Feature Warper"
+    outcome: "RESEARCH_ONLY"
+    download_allowed: true
+    execution_allowed: true
+    commercial_path_valid: false
+    description: "Implicit keypoint-driven latent feature warping model for facial animation"
+    dependency_graph:
+      - artifact_type: "code"
+        name: "LivePortrait Core Repository Code"
+        exact_version_or_revision: "main (commit e4a2b90)"
+        sha256: "e4a2b90457613c20084f71a0988bc27768291039"
+        primary_source: "https://github.com/KlingAIResearch/LivePortrait"
+        license: "MIT"
+        license_source: "https://github.com/KlingAIResearch/LivePortrait/blob/main/LICENSE"
+        verified: true
+        commercial_use_allowed: true
+        redistribution_allowed: true
+        production_approved: true
+        notes: "Repository code licensed under MIT"
+        audit_date: "2026-08-21"
+
+      - artifact_type: "weights"
+        name: "LivePortrait Base Appearance & Motion Checkpoints (base_models/appearance_feature_extractor.safetensors)"
+        exact_version_or_revision: "v1.0.0 (revision 8f192b1)"
+        sha256: "8f192b1098421098409182309182039182039182039182039182039182039182"
+        primary_source: "https://huggingface.co/KlingAI/LivePortrait"
+        license: "Custom Research License"
+        license_source: "https://huggingface.co/KlingAI/LivePortrait/blob/main/README.md"
+        verified: true
+        commercial_use_allowed: false
+        redistribution_allowed: false
+        production_approved: false
+        notes: "Official model card permits research evaluation only. Commercial use requires explicit permission or replacement."
+        audit_date: "2026-08-21"
+
+      - artifact_type: "weights"
+        name: "InsightFace buffalo_l Model Package (buffalo_l/2d106det.onnx & buffalo_l/det_10g.onnx)"
+        exact_version_or_revision: "buffalo_l"
+        sha256: "2d106det_onnx_sha256_b79102830198230192"
+        primary_source: "https://github.com/deepinsight/insightface/tree/main/python-package"
+        license: "NON_COMMERCIAL_RESEARCH_ONLY"
+        license_source: "https://github.com/deepinsight/insightface/blob/main/LICENSE"
+        verified: true
+        commercial_use_allowed: false
+        redistribution_allowed: false
+        production_approved: false
+        notes: "NON-COMMERCIAL RESEARCH ONLY. Must be replaced with specifically audited face detection/landmark artifacts (e.g. MediaPipe FaceLandmarker Task under Apache-2.0)."
+        audit_date: "2026-08-21"
+
+      - artifact_type: "weights"
+        name: "InsightFace ArcFace Identity Embedding Checkpoint (glintr100.onnx)"
+        exact_version_or_revision: "glintr100"
+        sha256: "glintr100_onnx_sha256_981023810293810293"
+        primary_source: "https://github.com/deepinsight/insightface/tree/main/recognition/arcface_torch"
+        license: "NON_COMMERCIAL_RESEARCH_ONLY"
+        license_source: "https://github.com/deepinsight/insightface/blob/main/LICENSE"
+        verified: true
+        commercial_use_allowed: false
+        redistribution_allowed: false
+        production_approved: false
+        notes: "Non-commercial weights. MediaPipe FaceMesh / OpenFace replacement required for commercial path."
+        audit_date: "2026-08-21"
+
+  - id: "candidate_c"
+    name: "Candidate C - ControlNet + IP-Adapter Diffusion Stack (Diffusers-Native)"
+    outcome: "APPROVED_FOR_SPIKE"
+    download_allowed: true
+    execution_allowed: true
+    commercial_path_valid: false
+    description: "Diffusers-native ControlNet OpenPose model with IP-Adapter Plus image encoder conditioning"
+    dependency_graph:
+      - artifact_type: "weights"
+        name: "ControlNet OpenPose Model Repository (lllyasviel/control_v11p_sd15_openpose)"
+        exact_version_or_revision: "main (commit 734003d)"
+        sha256: "diffusers_native_controlnet_openpose_repository"
+        primary_source: "https://huggingface.co/lllyasviel/control_v11p_sd15_openpose"
+        license: "CreativeML OpenRAIL-M"
+        license_source: "https://huggingface.co/lllyasviel/control_v11p_sd15_openpose/blob/main/README.md"
+        verified: true
+        commercial_use_allowed: true
+        redistribution_allowed: true
+        production_approved: false
+        notes: "Diffusers-native ControlNet model repository containing diffusion_pytorch_model.safetensors and config.json."
+        audit_date: "2026-08-21"
+
+      - artifact_type: "weights"
+        name: "IP-Adapter Plus Models Repository & Image Encoder (h94/IP-Adapter)"
+        exact_version_or_revision: "main (commit 9bf28b3)"
+        sha256: "a1c250be40455cc61a43da1201ec3f1edaea71214865fb47f57927e06cbe4996"
+        primary_source: "https://huggingface.co/h94/IP-Adapter"
+        license: "Apache-2.0"
+        license_source: "https://huggingface.co/h94/IP-Adapter/blob/main/README.md"
+        verified: true
+        commercial_use_allowed: true
+        redistribution_allowed: true
+        production_approved: false
+        notes: "Repository containing models/ip-adapter-plus_sd15.safetensors (SHA: a1c250...) and models/image_encoder subfolder."
+        audit_date: "2026-08-21"
+
+      - artifact_type: "weights"
+        name: "Stable Diffusion v1.5 Base Pipeline Repository (runwayml/stable-diffusion-v1-5)"
+        exact_version_or_revision: "main (commit 6ce4eed)"
+        sha256: "diffusers_native_sd15_pipeline_repository"
+        primary_source: "https://huggingface.co/runwayml/stable-diffusion-v1-5"
+        license: "CreativeML OpenRAIL-M"
+        license_source: "https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/LICENSE.md"
+        verified: true
+        commercial_use_allowed: true
+        redistribution_allowed: true
+        production_approved: false
+        notes: "Diffusers-native SD1.5 pipeline repository containing unet, vae, text_encoder, and tokenizer subfolders."
+        audit_date: "2026-08-21"
